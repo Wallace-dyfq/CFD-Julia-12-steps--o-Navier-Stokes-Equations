@@ -1,0 +1,1248 @@
+#+title:Welcome to CFD Julia
+#+HTML_MATHJAX: align: left indent: 5em tagside: right font: Neo-Euler
+#+OPTIONS: tex:t        
+#+author: Zhengrong Cheng 
+
+Hello! Welcome to the **12 steps to Navier-Stokes**. This is a practical module that is used in the beginning of an interactive Computational Fluid Dynamics (CFD) course taught by Prof. Lorena Barba between 2009 and 2013 at Boston University (Prof. Barba since moved to the George Washington University). The course assumes only basic programming knowledge (in any language) and of course some foundation in partial differential equations and fluid mechanics. The practical module was inspired by the ideas of Dr. Rio Yokota, who was a post-doc in Prof. Barba's lab, and has been refined by Prof. Barba and her students over several semesters teaching the course. The course is taught entirely using Python and students who don't know Python just learn as we work through the module.
+
+This repository aims to transfer the python codes to [[https://www.google.ca/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwivoeaA8aXPAhVH3mMKHUC8BCUQFggcMAA&url=http%3A%2F%2Fjulialang.org%2F&usg=AFQjCNF47iiW0ylaSeEf0dOl27c5kZ22MA&sig2=opOYtHDIuNYVSPcZ7B3ooQ&bvm=bv.133700528,d.cGc][julia]] as a personal exercise. 
+
+Enjoy it!!!
+
+* Step 1: 1-D Linear Convection
+** Mathematical Model 
+\begin{equation}
+\frac{\partial u}{\partial t} + c \frac{\partial u}{\partial x} = 0
+\end{equation}
+
+- Introduce the idea of a grid
+- Expand equation using the definition of a derivative
+- Discretize into small chunks
+- Re-arrange to solve for $u^{n+1}_i$
+- Initial and boundary conditions
+** Discretize Equations
+$$\frac{u_i^{n+1}-u_i^n}{\Delta t} + c \frac{u_i^n - u_{i-1}^n}{\Delta x} = 0 $$
+$$u_i^{n+1} = u_i^n - c \frac{\Delta t}{\Delta x}(u_i^n-u_{i-1}^n)$$
+
+
+** Julia Codes
+#+BEGIN_SRC julia 
+using PyPlot
+nx = 41 ; # try changing this number from 41 to 81 and Run All ... what happens?
+dx = 2/(nx-1);
+nt = 25 ;   #nt is the number of timesteps we want to calculate
+dt = .025 ; #dt is the amount of time each timestep covers (delta t)
+c = 1;      #assume wavespeed of c = 1
+u = ones(nx); # function ones()
+s=Int(0.5/dx);e=Int(1/dx);
+u[s:e]= 2;
+print(u)
+plot(linspace(0,2,nx), u)
+un = ones(nx); #initialize a temporary array
+
+for n in 1:nt #loop for values of n from 0 to nt, so it will run nt times
+    un = copy(u) ##copy the existing values of u into un
+    for i in 2:nx ## you can try commenting this line and...
+        u[i] = un[i]-c*dt/dx*(un[i]-un[i-1]);
+    end
+end
+        
+figure()
+plot(linspace(0,2,nx),u);     
+
+
+#+END_SRC
+* Step 2: 1-D Nonlinear Convection
+** Mathematical Model 
+\begin{equation}
+\frac{\partial u}{\partial t} + u \frac{\partial u}{\partial x} = 0
+\end{equation}
+
+
+- Introduce non-linear PDE equation
+- Expand equation using definition of derivative
+- Discretize
+- Solve for $u^{n+1}_i$
+
+** Discretized Equations
+$$\frac{u_i^{n+1}-u_i^n}{\Delta t} + u_i^n \frac{u_i^n-u_{i-1}^n}{\Delta x} = 0$$
+
+$$u_i^{n+1} = u_i^n - u_i^n \frac{\Delta t}{\Delta x} (u_i^n - u_{i-1}^n)$$
+** Julia Codes
+#+BEGIN_SRC julia 
+using PyPlot
+nx = 41 ; # try changing this number from 41 to 81 and Run All ... what happens?
+dx = 2/(nx-1);
+nt = 25 ;   #nt is the number of timesteps we want to calculate
+dt = .025 ; #dt is the amount of time each timestep covers (delta t)
+c = 1;      #assume wavespeed of c = 1
+u = ones(nx);    # function ones()
+s=Int(0.5/dx);e=Int(1/dx);
+u[s:e]= 2;
+un = ones(nx); #initialize a temporary array
+
+for n in 1:nt #loop for values of n from 0 to nt, so it will run nt times
+    un = copy(u) ##copy the existing values of u into un
+    for i in 2:nx ## you can try commenting this line and...
+        u[i] = un[i]-un[i]*dt/dx*(un[i]-un[i-1]);
+    end
+end
+plot(linspace(0,2,nx),u);      
+#+END_SRC
+* CFL Condition
+
+  - The Courant number
+  - Explanation of blow-up behavior when wave travels a distance $> dx$ during a time $dt$
+
+
+* Step 3: 1-D Diffusio
+** Mathematical Model 
+\begin{equation}
+\frac{\partial u}{\partial t} = \nu \frac{\partial ^2 u}{\partial x^2}
+\end{equation}
+
+- Introduce diffusion equation
+- Discretize 2nd order derivative using Taylor series expansion
+- Discretize time derivative using def. of derivative
+** Discretized Equations
+$u_{i+1} = u_i + \Delta x \frac{\partial u}{\partial x}\bigg|_i + \frac{\Delta x^2}{2} \frac{\partial ^2 u}{\partial x^2}\bigg|_i + \frac{\Delta x^3}{3} \frac{\partial ^3 u}{\partial x^3}\bigg|_i + O(\Delta x^4)$
+
+$u_{i-1} = u_i - \Delta x \frac{\partial u}{\partial x}\bigg|_i + \frac{\Delta x^2}{2} \frac{\partial ^2 u}{\partial x^2}\bigg|_i - \frac{\Delta x^3}{3} \frac{\partial ^3 u}{\partial x^3}\bigg|_i + O(\Delta x^4)$
+$$\frac{\partial ^2 u}{\partial x^2}=\frac{u_{i+1}-2u_{i}+u_{i-1}}{\Delta x^2} + O(\Delta x^2)$$
+$$\frac{u_{i}^{n+1}-u_{i}^{n}}{\Delta t}=\nu\frac{u_{i+1}^{n}-2u_{i}^{n}+u_{i-1}^{n}}{\Delta x^2}$$
+
+
+$$u_{i}^{n+1}=u_{i}^{n}+\frac{\nu\Delta t}{\Delta x^2}(u_{i+1}^{n}-2u_{i}^{n}+u_{i-1}^{n})$$
+** Julia Codes
+   #+BEGIN_SRC julia 
+
+   using PyPlot
+function diffusion_1d(nx)
+    #nx = 41 ; # try changing this number from 41 to 81 and Run All ... what happens?
+    dx = 2/(nx-1);
+    nt = 20 ;   #nt is the number of timesteps we want to calculate
+    nu = 0.3   #the value of viscosity
+    sigma = .2 #sigma is a parameter, we'll learn more about it later
+    dt = (sigma*(dx^2))/nu ; #dt is the amount of time each timestep covers (delta t)
+    
+    
+    u = ones(nx);    # function ones()
+    s=Int(0.5/dx);e=Int(1/dx);
+    u[s:e]= 2;
+    #plot(linspace(0,2,nx),u);    
+    un = ones(nx); #initialize a temporary array
+    for n in 1:nt #loop for values of n from 0 to nt, so it will run nt times
+        un = copy(u) ##copy the existing values of u into un
+        for i in 2:nx-1 ## you can try commenting this line and...
+            u[i] = un[i]+nu*dt/dx^2*(un[i+1]-2*un[i]+un[i-1]);
+                #plot(linspace(0,2,nx),u);    
+
+        end
+    end
+    plot(linspace(0,2,nx),u);    
+end
+
+   #+END_SRC
+* Step4: 1-D Burgers' Equation
+** Mathematical Model 
+
+\begin{equation}
+\frac{\partial u}{\partial t} + u \frac{\partial u}{\partial x} = \nu \frac{\partial ^2 u}{\partial x^2}
+\end{equation}
+
+- Introduce Burgers' Equation
+- Note that it is combination of diffusion and non-linear convection
+- Introduce different I.C. and B.C. for periodic behavior
+  + e.g. What does $u^{n}_{i+1}$ \textit{mean} at the end of the frame?
+** Discretized Equations
+
+$$\frac{u_i^{n+1}-u_i^n}{\Delta t} + u_i^n \frac{u_i^n - u_{i-1}^n}{\Delta x} = \nu \frac{u_{i+1}^n - 2u_i^n + u_{i-1}^n}{\Delta x^2}$$
+
+
+$$u_i^{n+1} = u_i^n - u_i^n \frac{\Delta t}{\Delta x} (u_i^n - u_{i-1}^n) + \nu \frac{\Delta t}{\Delta x^2}(u_{i+1}^n - 2u_i^n + u_{i-1}^n)$$
+
+
+Our initial condition for this problem is going to be:
+
+\begin{eqnarray}
+u &=& -\frac{2 \nu}{\phi} \frac{\partial \phi}{\partial x} + 4 \\\
+\phi &=& \exp \bigg(\frac{-x^2}{4 \nu} \bigg) + \exp \bigg(\frac{-(x-2 \pi)^2}{4 \nu} \bigg)
+\end{eqnarray}
+
+This has an analytical solution, given by:
+
+\begin{eqnarray}
+u &=& -\frac{2 \nu}{\phi} \frac{\partial \phi}{\partial x} + 4 \\\
+\phi &=& \exp \bigg(\frac{-(x-4t)^2}{4 \nu (t+1)} \bigg) + \exp \bigg(\frac{-(x-4t -2 \pi)^2}{4 \nu(t+1)} \bigg)
+\end{eqnarray}
+
+Our boundary condition will be:
+
+$$u(0) = u(2\pi)$$
+** Julia Codes
+   #+BEGIN_SRC julia 
+using SymPy
+Sympy.init_printing(use_latex=True)
+t = Sym("t");
+x, nu= symbols("x,nu", real=true);
+phi = exp(-(x-4*t)^2/(4*nu*(t+1))) + exp(-(x-4*t-2*pi)^2/(4*nu*(t+1)))
+phiprime = diff(phi,x)
+print(phiprime)
+
+u = -2*nu*(phiprime/phi)+4
+print(u)
+   
+ufunc = lambdify(u,(t, x, nu))
+print(ufunc(1,4,3))
+
+using PyPlot
+nx = 101 ; # try changing this number from 41 to 81 and Run All ... what happens?
+dx = 2*pi/(nx-1);
+nt = 100 ;   #nt is the number of timesteps we want to calculate
+nu = 0.07;   #the value of viscosity
+dt = dx*nu; #dt is the amount of time each timestep covers (delta t)
+x=linspace(0,2*pi, nx)
+un = zeros(nx)
+t = 0
+u = [ufunc(t,x0,nu) for x0 in x]
+    
+figure(figsize=(11,7),dpi=100)
+plot(x,u,marker="o",lw=2)
+xlim(0,2pi)
+ylim(0,10)
+
+for n in 1:nt   # time steps
+    un = copy(u);
+    for i in 2:nx-1
+        u[i] = un[i] - un[i] * dt/dx *(un[i] - un[i-1]) + nu*dt/dx^2*(un[i+1]-2*un[i]+un[i-1]);
+    end
+    u[1] = un[1] - un[1] * dt/dx * (un[1] - un[end-1]) + nu*dt/dx^2*(un[2]-2*un[1]+un[end-1]);
+    u[end] = un[end] - un[end] * dt/dx * (un[end] - un[end-1]) + nu*dt/dx^2*(un[1]-2*un[end]+un[end-1]);
+end
+        
+
+u_analytical = [ufunc(nt*dt, xi, nu) for xi in x];
+figure(figsize=(11,7), dpi=100)
+plot(x,u, marker="o", lw=2, label="Computational")
+plot(x, u_analytical, label="Analytical")
+xlim(0,2*pi)
+ylim([0,10])
+legend();
+   #+END_SRC 
+* Array Operations
+Another brief interlude to introduce handling calculations with array operations instead of iterating over the entire array.
+
+* Step 5: 2D Linear Convection
+** Mathematical Model 
+\begin{equation}
+\frac{\partial u}{\partial t} + c (\frac{\partial u}{\partial x} + \frac{\partial u}{\partial y}) = 0
+\end{equation}
+
+- Introduction to 2D grid
+- Extension of current discretization rules into $i,j$ flatland
+- Discretize 2D equation and solve for unknown
+** Discretized Equations
+$$\frac{u_{i,j}^{n+1}-u_{i,j}^n}{\Delta t} + c\frac{u_{i, j}^n-u_{i-1,j}^n}{\Delta x} + c\frac{u_{i,j}^n-u_{i,j-1}^n}{\Delta y}=0$$
+
+As before, solve for the only unknown:
+
+$$u_{i,j}^{n+1} = u_{i,j}^n-c \frac{\Delta t}{\Delta x}(u_{i,j}^n-u_{i-1,j}^n)-c \frac{\Delta t}{\Delta y}(u_{i,j}^n-u_{i,j-1}^n)$$
+
+We will solve this equation with the following initial conditions:
+
+$$u(x) = \begin{cases}
+\begin{matrix}
+2\ \text{for} & 0.5 \leq x \leq 1 \cr
+1\ \text{for} & \text{everywhere else}\end{matrix}\end{cases}$$
+
+and boundary conditions:
+
+$$u = 1\ \text{for } \begin{cases}
+\begin{matrix}
+x =  0,\ 2 \cr
+y =  0,\ 2 \end{matrix}\end{cases}$$
+** Julia Codes
+#+BEGIN_SRC 
+using PyPlot
+###variable declarations
+nx = 81
+ny = 81
+nt = 100
+c = 1
+dx = 2/(nx-1)
+dy = 2/(ny-1)
+sigma = .2
+dt = sigma*dx
+
+x = linspace(0,2,nx)
+y = linspace(0,2,ny)
+
+u = ones(ny,nx) ##create a 1xn vector of 1's
+un = ones(ny,nx) ##
+
+###Assign initial conditions
+
+u[Int(.5/dy):Int(1/dy),Int(.5/dx):Int(1/dx)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+
+###Plot Initial Condition
+fig = figure(figsize=(11,7), dpi=100)          ##the figsize parameter can be used to produce different sized images
+#ax = fig.gca(projection="3d")                      
+s =surf(x,y,u)
+
+u = ones((ny,nx))
+u[Int(.5/dy):Int(1/dy)+1,Int(.5/dx):Int(1/dx+1)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+
+for n in 0:nt ##loop across number of time steps
+    un = copy(u)
+    row, col = size(u)
+    for j in 2:row-1
+        for i in 2:col-1
+            u[j,i] = un[j, i] - (c*dt/dx*(un[j,i] - un[j,i-1]))-(c*dt/dy*(un[j,i]-un[j-1,i]))
+            u[1,:] = 1
+            u[end,:] = 1
+            u[:,1] = 1
+            u[:,end] = 1
+        end
+    end
+end
+
+fig = figure(figsize=(11,7), dpi=100)
+s = surf(x,y, u)
+
+u = ones((ny,nx))
+u[Int(.5/dy):Int(1/dy)+1,Int(.5/dx):Int(1/dx+1)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+
+for n in 1:nt ##loop across number of time steps
+    un = copy(u)
+    u[2:end,2:end]=un[2:end,2:end]-(c*dt/dx*(un[2:end,2:end]-un[2:end,1:end-1]))-(c*dt/dy*(un[2:end,2:end]-un[1:end-1,2:end]))
+    u[1,:] = 1
+    u[end,:] = 1
+    u[:,1] = 1
+    u[:,end] = 1
+end
+
+fig = figure(figsize=(11,7), dpi=100)
+s = surf(x,y, u)
+    
+
+#+END_SRC
+* Step 6: 2D Nonlinear Convection
+** Mathematical Model 
+\begin{equation}
+\label{eq:1}
+\frac{\partial u}{\partial t} + u \frac{\partial u}{\partial x} + v \frac{\partial u}{\partial y} = 0
+\end{equation}
+\begin{equation}
+\label{eq:2}
+\frac{\partial v}{\partial t} + u \frac{\partial v}{\partial x} + v \frac{\partial v}{\partial y} = 0
+\end{equation}
+
+ - Introduction of coupled PDEs
+ - Discretization of two equations
+ - Solving for both $u^{n+1}_{i,j}$ and $v^{n+1}_{i,j}$
+** Discretized Equations
+$$\frac{u_{i,j}^{n+1}-u_{i,j}^n}{\Delta t} + u_{i,j}^n \frac{u_{i,j}^n-u_{i-1,j}^n}{\Delta x} + v_{i,j}^n \frac{u_{i,j}^n-u_{i,j-1}^n}{\Delta y} = 0$$
+
+$$\frac{v_{i,j}^{n+1}-v_{i,j}^n}{\Delta t} + u_{i,j}^n \frac{v_{i,j}^n-v_{i-1,j}^n}{\Delta x} + v_{i,j}^n \frac{v_{i,j}^n-v_{i,j-1}^n}{\Delta y} = 0$$
+Rearranging both equations, we solve for $u_{i,j}^{n+1}$ and $v_{i,j}^{n+1}$, respectively.  Note that these equations are also coupled.  
+
+$$u_{i,j}^{n+1} = u_{i,j}^n - u_{i,j} \frac{\Delta t}{\Delta x} (u_{i,j}^n-u_{i-1,j}^n) - v_{i,j}^n \frac{\Delta t}{\Delta y} (u_{i,j}^n-u_{i,j-1}^n)$$
+
+$$v_{i,j}^{n+1} = v_{i,j}^n - u_{i,j} \frac{\Delta t}{\Delta x} (v_{i,j}^n-v_{i-1,j}^n) - v_{i,j}^n \frac{\Delta t}{\Delta y} (v_{i,j}^n-v_{i,j-1}^n)$$
+The initial conditions are the same that we used for 1D convection, applied in both the x and y directions.  
+
+$$u,\ v\ = \begin{cases}\begin{matrix}
+2 & \text{for } x,y \in (0.5, 1)\times(0.5,1) \cr
+1 & \text{everywhere else}
+\end{matrix}\end{cases}$$
+
+The boundary conditions hold u and v equal to 1 along the boundaries of the grid
+.
+
+$$u = 1,\ v = 1 \text{ for } \begin{cases} \begin{matrix}x=0,2\cr y=0,2 \end{matrix}\end{cases}$$
+
+** Julia Codes
+#+BEGIN_SRC julia 
+using PyPlot
+
+###variable declarations
+nx = 101;
+ny = 101;
+nt = 80;
+c = 1;
+dx = 2/(nx-1);
+dy = 2/(ny-1);
+sigma = 0.2;
+dt = sigma*dx;
+
+x = linspace(0,2,nx);
+y = linspace(0,2,ny);
+
+u = ones(ny,nx) ;##create a 1xn vector of 1's
+v = ones(ny,nx);
+un = ones(ny,nx);
+vn = ones(ny,nx);
+
+###Assign initial conditions
+s=Int(.5/dy);
+e=Int(1/dy);
+u[s:e,s:e]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+v[s:e,s:e]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+fig = figure(figsize=(11,7), dpi=100)          ##the figsize parameter can be used to produce different sized images
+#ax = fig.gca(projection="3d")                      
+ss =surf(x,y,u,cmap=ColorMap("coolwarm"))
+figure()
+ss2=surf(x,y,v)
+
+ss3=surf(x,y,u)
+
+for n in 1:nt ##loop across number of time steps
+    un = copy(u)
+    vn = copy(v)
+
+
+    u[2:end,2:end]=un[2:end,2:end]-(un[2:end,2:end].*(c*dt/dx*(un[2:end,2:end]-un[2:end,1:end-1])))-(vn[2:end,2:end].*(c*dt/dy*(un[2:end,2:end]-un[1:end-1,2:end])))
+    v[2:end,2:end]=vn[2:end,2:end]-(un[2:end,2:end].*(c*dt/dx*(vn[2:end,2:end]-vn[2:end,1:end-1])))-(vn[2:end,2:end].*(c*dt/dy*(vn[2:end,2:end]-vn[1:end-1,2:end])))
+
+    #u[2:end,2:end]=un[2:end,2:end]-(un[2:end,2:end]*c*dt/dx*(un[2:end,2:end]-un[2:end,1:end-1]))-(vn[2:end,2:end]*c*dt/dy*(un[2:end,2:end]-un[1:end-1,2:end]))
+    #v[2:end,2:end]=vn[2:end,2:end]-(un[2:end,2:end]*c*dt/dx*(vn[2:end,2:end]-vn[2:end,1:end-1]))-(vn[2:end,2:end]*c*dt/dy*(vn[2:end,2:end]-vn[1:end-1,2:end]))
+    
+    u[1,:] = 1;
+    u[end,:] = 1;
+    u[:,1] = 1;
+    u[:,end] = 1;
+    
+    v[1,:] = 1;
+    v[end,:] = 1;
+    v[:,1] = 1;
+    v[:,end] = 1;
+    #fig = figure(figsize=(11,7), dpi=100)          ##the figsize parameter can be used to produce different sized images
+#ax = fig.gca(projection="3d")                      
+   # ss =surf(x,y,u)
+end
+
+###Plot Initial Condition
+fig = figure(figsize=(11,7), dpi=100)          ##the figsize parameter can be used to produce different sized images
+#ax = fig.gca(projection="3d")                      
+s =surf(x,y,u,cmap=ColorMap("coolwarm"))
+
+###Plot Initial Condition
+fig = figure(figsize=(11,7), dpi=100)          ##the figsize parameter can be used to produce different sized images
+#ax = fig.gca(projection="3d")   
+ax=axes()
+xgrid=repmat(x',nx,1)
+ygrid=repmat(y,1,nx)
+#ax[:plot_surface](xgrid, ygrid,v,cmap=ColorMap("gray"))
+#s =surf(x,y,v,)
+#s =surf(x,y,v,)
+#get_cmap("bwr")
+ss5=surf(xgrid,ygrid,v,cmap=ColorMap("coolwarm"))
+#+END_SRC
+* Step 7: 2D Diffusion 
+** Mathematical Model 
+\begin{equation}
+\label{eq:3}
+\frac{\partial u}{\partial t} = \nu \frac{\partial ^2 u}{\partial x^2} + \nu \frac{\partial ^2 u}{\partial y^2}
+\end{equation}
+** Discretized Equations
+\begin{equation}
+\label{eq:4}
+u_{i,j}^{n+1} = u_{i,j}^n + \frac{\nu \Delta t}{\Delta x^2}(u_{i+1,j}^n - 2 u_{i,j}^n + u_{i-1,j}^n) + \frac{\nu \Delta t}{\Delta y^2}(u_{i,j+1}^n-2 u_{i,j}^n + u_{i,j-1}^n)
+\end{equation}
+  - Introduction to 2D diffusion equation
+  - Discretization of equation, etc...
+
+
+** Julia Codes
+#+BEGIN_SRC julia
+
+using PyPlot
+plt=PyPlot
+
+###variable declarations
+nx = 101;
+ny = 101;
+#nt = 17;
+nu=.2;
+dx = 2/(nx-1);
+dy = 2/(ny-1);
+sigma = .25;
+dt = sigma*dx*dy/nu;
+
+x = linspace(0,2,nx);
+y = linspace(0,2,ny);
+
+u = ones(ny,nx); ##create a 1xn vector of 1's
+un = ones(ny,nx); 
+dx,dy
+0.5/dx, 1/dy
+
+###Assign initial conditions
+s=Int(floor(0.5/dy));
+e=Int(floor(1.0/dy));
+u[s:e,s:e]=2; ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+#u[Int(.5/dy):Int(1/dy),Int(0.5/dx):Int(1/dx)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+
+fig1 = figure()
+#ax = fig.gca(projection='3d')
+#surf = ax.plot_surface(X,Y,u, rstride=1, cstride=1, cmap=cm.coolwarm,
+ #       linewidth=0, antialiased=False)
+ss = surf(x,y,u)
+xlim(0,2)
+ylim(0,2)
+zlim(1,2.5);
+
+###Run through nt timesteps
+function diffuse(nt)
+    ###Assign initial conditions
+    s=Int(floor(0.5/dy));
+    e=Int(floor(1.0/dy));
+    u[s:e,s:e]=2; ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+    #u[Int(.5/dy):Int(1/dy),Int(0.5/dx):Int(1/dx)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+
+    
+    for n in 1:nt 
+        un = copy(u) ;
+        u[2:end-1,2:end-1]=un[2:end-1,2:end-1]+nu*dt/dx^2*(un[2:end-1,3:end]-2*un[2:end-1,2:end-1]+un[2:end-1,1:end-2])+nu*dt/dy^2*(un[3:end,2:end-1]-2*un[2:end-1,2:end-1]+un[1:end-2,2:end-1])
+        u[1,:]=1
+        u[end,:]=1
+        u[:,1]=1
+        u[:,end]=1
+    end
+    xgrid = repmat(x', nx, 1 )
+    ygrid = repmat(y, 1, ny )
+    fig1 = figure()
+    ax=plt.gca()
+    #ss = surf(x,y,u,cmap=ColorMap("coolwarm"))
+    plt.plot_surface(xgrid,ygrid,u,cmap=ColorMap("coolwarm"))
+    xlim(0,2)
+    ylim(0,2)
+    zlim(1,2.5);
+end
+    
+diffuse(10)
+diffuse(100)
+diffuse(500)
+diffuse(1000)
+#+END_SRC
+
+* Step 8: 2D Burgers' Equations
+
+** Mathematical Model 
+\begin{equation}
+\label{eq:5}
+\frac{\partial u}{\partial t} + u \frac{\partial u}{\partial x} + v \frac{\partial u}{\partial y} = \nu \; \left(\frac{\partial ^2 u}{\partial x^2} + \frac{\partial ^2 u}{\partial y^2}\right)
+\end{equation}
+
+\begin{equation}
+\label{eq:6}
+\frac{\partial v}{\partial t} + u \frac{\partial v}{\partial x} + v \frac{\partial v}{\partial y} = \nu \; \left(\frac{\partial ^2 v}{\partial x^2} + \frac{\partial ^2 v}{\partial y^2}\right)
+\end{equation}
+
+** Discretized Equations
+\begin{equation}
+\label{eq:7}
+u_{i,j}^{n+1} = u_{i,j}^n - \frac{\Delta t}{\Delta x} u_{i,j}^n (u_{i,j}^n - u_{i-1,j}^n) - \frac{\Delta t}{\Delta y} v_{i,j}^n (u_{i,j}^n - u_{i,j-1}^n)+\frac{\nu \Delta t}{\Delta x^2}(u_{i+1,j}^n-2u_{i,j}^n+u_{i-1,j}^n) + \frac{\nu \Delta t}{\Delta y^2} (u_{i,j+1}^n - 2u_{i,j}^n + u_{i,j+1}^n)
+\end{equation}
+
+\begin{equation}
+\label{eq:8}
+v_{i,j}^{n+1} =  v_{i,j}^n - \frac{\Delta t}{\Delta x} u_{i,j}^n (v_{i,j}^n - v_{i-1,j}^n) - \frac{\Delta t}{\Delta y} v_{i,j}^n (v_{i,j}^n - v_{i,j-1}^n)+\frac{\nu \Delta t}{\Delta x^2}(v_{i+1,j}^n-2v_{i,j}^n+v_{i-1,j}^n) + \frac{\nu \Delta t}{\Delta y^2} (v_{i,j+1}^n - 2v_{i,j}^n + v_{i,j+1}^n)
+\end{equation}
+
+
+\begin{equation}
+\label{eq:11}
+
+\end{equation}
+** Julia Codes
+Here comes Julia codes for this problem.
+#+BEGIN_SRC julia
+using PyPlot
+plt=PyPlot
+
+###variable declarations
+nx = 41;
+ny = 41;
+nt = 120;
+c = 1;
+dx = 2/(nx-1);
+dy = 2/(ny-1);
+sigma = .0009;
+nu = 0.01;
+dt = sigma*dx*dy/nu;
+
+
+x = linspace(0,2,nx);
+y = linspace(0,2,ny);
+
+u = ones((ny,nx)); ##create a 1xn vector of 1's
+v = ones((ny,nx));
+un = ones((ny,nx)); ##
+vn = ones((ny,nx));
+comb = ones((ny,nx))
+
+###Assign initial conditions
+
+u[Int(.5/dy):Int(1/dy),Int(.5/dx):Int(1/dx)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+v[Int(.5/dy):Int(1/dy),Int(.5/dx):Int(1/dx)]=2 ##set hat function I.C. : u(.5<=x<=1 && .5<=y<=1 ) is 2
+
+###(plot ICs)
+fig0 = plt.figure(figsize=(11,7), dpi=100)
+
+wire1 = plt.plot_wireframe(x,y,u, cmap=ColorMap("coolwarm"))
+wire2 = plt.plot_wireframe(x,y,v, cmap=ColorMap("coolwarm"))
+
+for n in 1:nt ##loop across number of time steps
+    un = copy(u)
+    vn = copy(v)
+
+    u[2:end-1,2:end-1] = un[2:end-1,2:end-1] - dt/dx*un[2:end-1,2:end-1].*(un[2:end-1,2:end-1]-un[2:end-1,1:end-2])-
+dt/dy*vn[2:end-1,2:end-1].*(un[2:end-1,2:end-1]-un[1:end-2,2:end-1])+
+nu*dt/dx^2*(un[2:end-1,3:end]-2*un[2:end-1,2:end-1]+un[2:end-1,1:end-2])+
+nu*dt/dy^2*(un[3:end,2:end-1]-2*un[2:end-1,2:end-1]+un[3:end,2:end-1])
+    
+    v[2:end-1,2:end-1] = vn[2:end-1,2:end-1] - dt/dx*un[2:end-1,2:end-1].*(vn[2:end-1,2:end-1]-vn[2:end-1,1:end-2])-
+dt/dy*vn[2:end-1,2:end-1].*(vn[2:end-1,2:end-1]-vn[1:end-2,2:end-1])+
+nu*dt/dx^2*(vn[2:end-1,3:end]-2*vn[2:end-1,2:end-1]+vn[2:end-1,1:end-2])+
+nu*dt/dy^2*(vn[3:end,2:end-1]-2*vn[2:end-1,2:end-1]+vn[3:end,2:end-1])
+     
+    u[1,:] = 1
+    u[end,:] = 1
+    u[:,1] = 1
+    u[:,end] = 1
+    
+    v[1,:] = 1
+    v[end,:] = 1
+    v[:,1] = 1
+    v[:,end] = 1
+end
+
+fig = plt.figure(figsize=(11,7), dpi=100)
+wire1 = plt.plot_wireframe(x,y,u,color="b")
+fig2=plt.figure(figsize=(11,7),dpi=100)
+wire2 = plt.plot_wireframe(x,y,v,color="k")
+
+#+END_SRC 
+
+
+* Defining Function in Julia
+
+* Step 9: 2D Laplace Equation
+** Mathematical Model 
+
+\begin{equation}
+\label{eq:12}
+\frac{\partial ^2 p}{\partial x^2} + \frac{\partial ^2 p}{\partial y^2} = 0
+\end{equation}
+** Discretized Equations
+\begin{equation}
+\label{eq:13}
+\frac{p_{i+1, j}^n - 2p_{i,j}^n + p_{i-1,j}^n}{\Delta x^2} + \frac{p_{i,j+1}^n - 2p_{i,j}^n + p_{i, j-1}^n}{\Delta y^2} = 0
+\end{equation}
+
+\begin{equation}
+\label{eq:14}
+p_{i,j}^n = \frac{\Delta y^2(p_{i+1,j}^n+p_{i-1,j}^n)+\Delta x^2(p_{i,j+1}^n + p_{i,j-1}^n)}{2(\Delta x^2 + \Delta y^2)}
+
+\end{equation}
+
+
+boundary conditions are:
+
+$p=0$ at $x=0$
+
+$p=y$ at $x=2$
+
+$\frac{\partial p}{\partial y}=0$ at $y=0, \ 1$
+** Julia Codes
+#+BEGIN_SRC julia
+
+using PyPlot
+plt=PyPlot
+
+function plot2D(x, y, p)
+    fig = plt.figure(figsize=(11,7), dpi=100)
+    ss = plt.plot_surface(x,y,p, rstride=1, cstride=1, cmap=ColorMap("coolwarm"),
+            linewidth=0)
+    xlim(0,2)
+    ylim(0,1)
+end
+
+function laplace2d(p, y, dx, dy, l1norm_target)
+    l1norm = 1;
+    pn = zeros(size(p));
+    tol=10000;
+    count=1;
+    while (l1norm > l1norm_target || count > tol)
+        pn = copy(p);
+        p[2:end-1,2:end-1] = (dy^2*(pn[2:end-1,3:end]+pn[2:end-1,1:end-2])+dx^2*(pn[3:end,2:end-1]+pn[1:end-2,2:end-1]))/(2*(dx^2+dy^2)) 
+            
+        p[:,1] = 0;       ##p = 0 @ x = 0
+        p[:,end] = y;      ##p = y @ x = 2
+        p[1,:] = p[1,:]  ##dp/dy = 0 @ y = 0
+        p[end,:] = p[end-2,:]    ##dp/dy = 0 @ y = 1
+        l1norm = norm((p-pn)./pn,1)
+        count +=1;
+    end
+    p
+end
+
+##variable declarations
+nx = 31;
+ny = 31;
+c = 1;
+dx = 2/(nx-1);
+dy = 2/(ny-1);
+
+
+##initial conditions
+p = zeros((ny,nx)) ;##create a XxY vector of 0's
+
+
+##plotting aids
+x = linspace(0,2,nx);
+y = linspace(0,1,ny);
+
+##boundary conditions
+p[:,1] = 0;     ##p = 0 @ x = 0
+p[:,end] = y;    ##p = y @ x = 2
+p[1,:] = p[2,:];    ##dp/dy = 0 @ y = 0
+##dp/dy = 0 @ y = 1
+p[end,:] = p[end-2,:];
+plot2D(x, y, p)
+
+p = laplace2d(p, y, dx, dy, 1e-4);
+fig2=plt.figure()
+plot2D(x, y, p)
+#+END_SRC
+
+
+* Step 10: 2D Poisson Equation
+** Mathematical Model 
+\begin{equation}
+\label{eq:15}
+\frac{\partial ^2 p}{\partial x^2} + \frac{\partial ^2 p}{\partial y^2} = b
+\end{equation}
+** Discretized Equations
+\begin{equation}
+\label{eq:16}
+\frac{p_{i+1,j}^{n}-2p_{i,j}^{n}+p_{i-1,j}^{n}}{\Delta x^2}+\frac{p_{i,j+1}^{n}-2 p_{i,j}^{n}+p_{i,j-1}^{n}}{\Delta y^2}=b_{i,j}^{n}
+\end{equation}
+
+\begin{equation}
+\label{eq:17}
+p_{i,j}^{n}=\frac{(p_{i+1,j}^{n}+p_{i-1,j}^{n})\Delta y^2+(p_{i,j+1}^{n}+p_{i,j-1}^{n})\Delta x^2-b_{i,j}^{n}\Delta x^2\Delta y^2}{2(\Delta x^2+\Delta y^2)}
+\end{equation}
+
+Boundary conditions:
+$p=0$ at $x=0, \ 2$ and $y=0, \ 1$
+
+$b_{i,j}=100$ at $i=nx/4, j=ny/4$
+
+$b_{i,j}=-100$ at $i=nx*3/4, j=3/4 ny$
+
+$b_{i,j}=0$ everywhere else.
+** Julia Codes
+#+BEGIN_SRC julia
+using PyPlot
+plt=PyPlot
+
+# Parameters
+nx = 50;
+ny = 50;
+nt  = 100;
+xmin = 0;
+xmax = 2;
+ymin = 0;
+ymax = 1;
+
+dx = (xmax-xmin)/(nx-1);
+dy = (ymax-ymin)/(ny-1);
+
+# Initialization
+p  = zeros((ny,nx));
+pd = zeros((ny,nx));
+b  = zeros((ny,nx));
+x  = linspace(xmin,xmax,nx);
+y  = linspace(xmin,xmax,ny);
+
+# Source
+b[Int(floor(ny/4)),Int(floor(nx/4))]  = 100;
+b[Int(floor(3*ny/4)),Int(floor(3*nx/4))] = -100;
+
+
+for it in 1:nt
+
+    pd = copy(p)
+
+    p[2:end-1,2:end-1] = ((pd[2:end-1,3:end] + pd[2:end-1,1:end-2])*dy^2 + 
+        (pd[3:end,2:end-1]+pd[1:end-2,2:end-1])*dx^2 -
+    b[2:end-1,2:end-1]*dx^2*dy^2)/(2*(dx^2+dy^2))
+
+    p[1,:] = 0
+    p[ny,:] = 0
+    p[:,1] = 0
+    p[:,nx] = 0
+end
+
+function plot2D(x, y, p)
+    fig = plt.figure(figsize=(11,7), dpi=100)
+    ss = plt.plot_surface(x,y,p, rstride=1, cstride=1, cmap=ColorMap("coolwarm"),
+            linewidth=0)
+    xlim(0,2)
+    ylim(0,1)
+end
+
+plot2D(x, y, p)
+#+END_SRC
+
+
+* Step 11: Cavity Flow with Navier-Stokes (last figure is not correct)
+** Mathematical Model 
+\begin{equation}
+\label{eq:18}
+\frac{\partial \vec{v}}{\partial t}+(\vec{v}\cdot\nabla)\vec{v}=-\frac{1}{\rho}\nabla p + \nu \nabla^2\vec{v}
+\end{equation}
+Here is the system of differential equations: two equations for the velocity components $u,v$ and one equation for pressure:
+\begin{equation}
+\label{eq:19}
+\frac{\partial u}{\partial t}+u\frac{\partial u}{\partial x}+v\frac{\partial u}{\partial y} = -\frac{1}{\rho}\frac{\partial p}{\partial x}+\nu \left(\frac{\partial^2 u}{\partial x^2}+\frac{\partial^2 u}{\partial y^2} \right) 
+\end{equation}
+
+\begin{equation}
+\label{eq:20}
+\frac{\partial v}{\partial t}+u\frac{\partial v}{\partial x}+v\frac{\partial v}{\partial y} = -\frac{1}{\rho}\frac{\partial p}{\partial y}+\nu\left(\frac{\partial^2 v}{\partial x^2}+\frac{\partial^2 v}{\partial y^2}\right) 
+\end{equation}
+
+\begin{equation}
+\label{eq:21}
+\frac{\partial^2 p}{\partial x^2}+\frac{\partial^2 p}{\partial y^2} = -\rho\left(\frac{\partial u}{\partial x}\frac{\partial u}{\partial x}+2\frac{\partial u}{\partial y}\frac{\partial v}{\partial x}+\frac{\partial v}{\partial y}\frac{\partial v}{\partial y} \right)
+
+\end{equation}
+
+** Discretized Equations
+\begin{eqnarray}
+&&\frac{u_{i,j}^{n+1}-u_{i,j}^{n}}{\Delta t}+u_{i,j}^{n}\frac{u_{i,j}^{n}-u_{i-1,j}^{n}}{\Delta x}+v_{i,j}^{n}\frac{u_{i,j}^{n}-u_{i,j-1}^{n}}{\Delta y}\\\ 
+&&=-\frac{1}{\rho}\frac{p_{i+1,j}^{n}-p_{i-1,j}^{n}}{2\Delta x}+\nu\left(\frac{u_{i+1,j}^{n}-2u_{i,j}^{n}+u_{i-1,j}^{n}}{\Delta x^2}+\frac{u_{i,j+1}^{n}-2u_{i,j}^{n}+u_{i,j-1}^{n}}{\Delta y^2}\right)\end{eqnarray}
+
+\begin{eqnarray}
+&&\frac{v_{i,j}^{n+1}-v_{i,j}^{n}}{\Delta t}+u_{i,j}^{n}\frac{v_{i,j}^{n}-v_{i-1,j}^{n}}{\Delta x}+v_{i,j}^{n}\frac{v_{i,j}^{n}-v_{i,j-1}^{n}}{\Delta y}\\\
+&&=-\frac{1}{\rho}\frac{p_{i,j+1}^{n}-p_{i,j-1}^{n}}{2\Delta y}
++\nu\left(\frac{v_{i+1,j}^{n}-2v_{i,j}^{n}+v_{i-1,j}^{n}}{\Delta x^2}+\frac{v_{i,j+1}^{n}-2v_{i,j}^{n}+v_{i,j-1}^{n}}{\Delta y^2}\right)\end{eqnarray}
+
+\begin{equation}
+\label{eq:22}
+\frac{p_{i+1,j}^{n}-2p_{i,j}^{n}+p_{i-1,j}^{n}}{\Delta x^2}+\frac{p_{i,j+1}^{n}-2*p_{i,j}^{n}+p_{i,j-1}^{n}}{\Delta y^2} 
+=\rho\left[\frac{1}{\Delta t}\left(\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}+\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right)\right.
+-\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}
+- \ 2\frac{u_{i,j+1}-u_{i,j-1}}{2\Delta y}\frac{v_{i+1,j}-v_{i-1,j}}{2\Delta x}
+-\left.\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right]
+\end{equation}
+\begin{equation}
+\label{eq:24}
+u_{i,j}^{n+1} = u_{i,j}^{n} - u_{i,j}^{n}\frac{\Delta t}{\Delta x}(u_{i,j}^{n}-u_{i-1,j}^{n})
+- v_{i,j}^{n}\frac{\Delta t}{\Delta y}(u_{i,j}^{n}-u_{i,j-1}^{n})$$
+$$-\frac{\Delta t}{\rho 2\Delta x}(p_{i+1,j}^{n}-p_{i-1,j}^{n})
++\nu\left(\frac{\Delta t}{\Delta x^2}(u_{i+1,j}^{n}-2u_{i,j}^{n}+u_{i-1,j}^{n})\right.
++\left.\frac{\Delta t}{\Delta y^2}(u_{i,j+1}^{n}-2u_{i,j}^{n}+u_{i,j-1}^{n})\right)
+\end{equation}
+
+
+\begin{equation}
+\label{eq:25}
+v_{i,j}^{n+1} = v_{i,j}^{n}-u_{i,j}^{n}\frac{\Delta t}{\Delta x}(v_{i,j}^{n}-v_{i-1,j}^{n})
+- v_{i,j}^{n}\frac{\Delta t}{\Delta y}(v_{i,j}^{n}-v_{i,j-1}^{n})
+\end{equation}
+
+\begin{equation}
+\label{eq:26}
+-\frac{\Delta t}{\rho 2\Delta y}(p_{i,j+1}^{n}-p_{i,j-1}^{n})
++\nu\left(\frac{\Delta t}{\Delta x^2}(v_{i+1,j}^{n}-2v_{i,j}^{n}+v_{i-1,j}^{n})\right.
++\left.\frac{\Delta t}{\Delta y^2}(v_{i,j+1}^{n}-2v_{i,j}^{n}+v_{i,j-1}^{n})\right)
+\end{equation}
+\begin{equation}
+\label{eq:27}
+p_{i,j}^{n}=\frac{(p_{i+1,j}^{n}+p_{i-1,j}^{n})\Delta y^2+(p_{i,j+1}^{n}+p_{i,j-1}^{n})\Delta x^2}{2(\Delta x^2+\Delta y^2)}-\frac{\rho\Delta x^2\Delta y^2}{2(\Delta x^2+\Delta y^2)} \times
+\end{equation}
+
+\begin{equation}
+\label{eq:28}
+\left[\frac{1}{\Delta t}\left(\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}+\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right)-\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\right. 
+\end{equation}
+
+\begin{equation}
+\label{eq:29}
+-2\frac{u_{i,j+1}-u_{i,j-1}}{2\Delta y}\frac{v_{i+1,j}-v_{i-1,j}}{2\Delta x}-\left.\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right]
+\end{equation}
+
+The initial condition is $u, v, p = 0$ everywhere, and the boundary conditions are:
+
+$u=1$ at $y=2$ (the "lid");
+
+$u, v=0$ on the other boundaries;
+
+$\frac{\partial p}{\partial y}=0$ at $y=0$;
+
+$p=0$ at $y=2$
+
+$\frac{\partial p}{\partial x}=0$ at $x=0,2$
+
+** Julia Codes
+The  codes for this problem are
+
+#+BEGIN_SRC julia 
+using PyPlot
+nx = 41G;
+ny = 41;
+nt = 500;
+nit=50;
+c = 1;
+dx = 2/(nx-1);
+dy = 2/(ny-1);
+x = linspace(0,2,nx);
+y = linspace(0,2,ny);
+
+rho = 1;
+nu = .1;
+dt = .001;
+
+u = zeros((ny, nx));
+v = zeros((ny, nx));
+p = zeros((ny, nx)) ;
+b = zeros((ny, nx));
+
+
+function buildUpB(b, rho, dt, u, v, dx, dy)
+    
+    b[2:end-1,2:end-1]=rho*(1/dt*((u[2:end-1,3:end]-u[2:end-1,1:end-2])/(2*dx)+(v[3:end,2:end-1]-v[1:end-2,2:end-1])/(2*dy))-
+    ((u[2:end-1,3:end]-u[2:end-1,1:end-2])/(2*dx))^2-
+    2*((u[3:end,2:end-1]-u[1:end-2,2:end-1])/(2*dy)*(v[2:end-1,3:end]-v[2:end-1,1:end-2])/(2*dx))-
+    ((v[3:end,2:end-1]-v[1:end-2,2:end-1])/(2*dy))^2);
+
+    return b;
+end
+
+function presPoisson(p, dx, dy, b)
+    pn = zeros(size(p));
+    pn = copy(p);
+    
+    for q in 1:nit
+        pn = copy(p);
+        p[2:end-1,2:end-1] = ((pn[2:end-1,3:end]+pn[2:end-1,1:end-2])*dy^2+(pn[3:end,2:end-1]+pn[1:end-2,2:end-1])*dx^2)/
+                        (2*(dx^2+dy^2)) -
+        dx^2*dy^2/(2*(dx^2+dy^2))*b[2:end-1,2:end-1];
+
+        p[:,end] =p[:,end-1]; ##dp/dy = 0 at x = 2
+        p[1,:] = p[2,:];  ##dp/dy = 0 at y = 0
+        p[:,1]=p[:,2];    ##dp/dx = 0 at x = 0
+        p[end,:]=0  ;      ##p = 0 at y = 2
+    end        
+    return p;
+end        
+
+function cavityFlow(nt, u, v, dt, dx, dy, p, rho, nu)
+    un = zeros(size(u));
+    vn = zeros(size(v));
+    b = zeros((ny, nx))
+    
+    for n in 1:nt
+        un = copy(u)
+        vn = copy(v)
+        
+        b = buildUpB(b, rho, dt, u, v, dx, dy);
+        p = presPoisson(p, dx, dy, b);
+        
+        u[2:end-1,2:end-1] = un[2:end-1,2:end-1]-
+            un[2:end-1,2:end-1]*dt/dx*(un[2:end-1,2:end-1]-un[2:end-1,1:end-2])-
+            vn[2:end-1,2:end-1]*dt/dy*(un[2:end-1,2:end-1]-un[1:end-2,2:end-1])-
+            dt/(2*rho*dx)*(p[2:end-1,3:end]-p[2:end-1,1:end-2])+
+        nu*(dt/dx^2*(un[2:end-1,3:end]-2*un[2:end-1,2:end-1]+un[2:end-1,1:end-2])+
+        dt/dy^2*(un[3:end,2:end-1]-2*un[2:end-1,2:end-1]+un[1:end-2,2:end-1]))
+
+        v[2:end-1,2:end-1] = vn[2:end-1,2:end-1]-
+        un[2:end-1,2:end-1]*dt/dx*(vn[2:end-1,2:end-1]-vn[2:end-1,1:end-2])-
+                        vn[2:end-1,2:end-1]*dt/dy*(vn[2:end-1,2:end-1]-vn[1:end-2,2:end-1])-
+                        dt/(2*rho*dy)*(p[3:end,2:end-1]-p[1:end-2,2:end-1])+
+                        nu*(dt/dx^2*(vn[2:end-1,3:end]-2*vn[2:end-1,2:end-1]+vn[2:end-1,1:end-2])+
+        (dt/dy^2*(vn[3:end,2:end-1]-2*vn[2:end-1,2:end-1]+vn[1:end-2,2:end-1])))
+
+        u[1,:] = 0
+        u[:,1] = 0
+        u[:,end] = 0
+        u[end,:] = 1    #set velocity on cavity lid equal to 1
+        v[1,:] = 0
+        v[end,:]=0
+        v[:,1] = 0
+        v[:,end] = 0
+        
+    end
+    return u, v, p
+end
+
+
+u = zeros((ny, nx));
+v = zeros((ny, nx));
+p = zeros((ny, nx));
+b = zeros((ny, nx));
+nt = 100;
+u, v, p = cavityFlow(nt, u, v, dt, dx, dy, p, rho, nu);
+fig = figure(figsize=(11,7), dpi=100)
+contourf(x,y,p,alpha=0.5)    ###plnttong the pressure field as a contour
+colorbar()
+contour(x,y,p)               ###plotting the pressure field outlines
+xgrid = repmat(x', nx, 1 )
+ygrid = repmat(y, 1, ny )
+quiver(xgrid[1:2:end,1:2:end],ygrid[1:2:end,1:2:end],u[1:2:end,1:2:end],v[1:2:end,1:2:end]) ##plotting velocity
+xlabel('X')
+ylabel('Y');
+
+u = zeros((ny, nx));
+v = zeros((ny, nx));
+p = zeros((ny, nx));
+b = zeros((ny, nx));
+nt = 700;
+u, v, p = cavityFlow(nt, u, v, dt, dx, dy, p, rho, nu);
+fig = figure(figsize=(11,7), dpi=100);
+contourf(x,y,p,alpha=0.5);
+colorbar();
+contour(x,y,p);
+quiver(xgrid[1:2:end,1:2:end],ygrid[1:2:end,1:2:end],u[1:2:end,1:2:end],v[1:2:end,1:2:end]); ##plotting velocity
+xlabel('X');
+ylabel('Y');
+#+END_SRC
+
+* Step 12: Channel Flow with Navier-Stokes
+
+** Mathematical Model 
+\begin{equation}
+\label{eq:9}
+ \frac{\partial u}{\partial t}+u\frac{\partial u}{\partial x}+v\frac{\partial u}{\partial y}=-\frac{1}{\rho}\frac{\partial p}{\partial x}+\nu\left(\frac{\partial^2 u}{\partial x^2}+\frac{\partial^2 u}{\partial y^2}\right)+F
+\end{equation}
+
+\begin{equation}
+\label{eq:10}
+\frac{\partial v}{\partial t}+u\frac{\partial v}{\partial x}+v\frac{\partial v}{\partial y}=-\frac{1}{\rho}\frac{\partial p}{\partial y}+\nu\left(\frac{\partial^2 v}{\partial x^2}+\frac{\partial^2 v}{\partial y^2}\right)
+\end{equation}
+
+
+\begin{equation}
+\label{eq:23}
+\frac{\partial^2 p}{\partial x^2}+\frac{\partial^2 p}{\partial y^2}=-\rho\left(\frac{\partial u}{\partial x}\frac{\partial u}{\partial x}+2\frac{\partial u}{\partial y}\frac{\partial v}{\partial x}+\frac{\partial v}{\partial y}\frac{\partial v}{\partial y}\right)
+\end{equation}
+
+ 
+** Discretized equations
+The $u$-momentum equation:
+
+\begin{eqnarray}
+&&\frac{u_{i,j}^{n+1}-u_{i,j}^{n}}{\Delta t}+u_{i,j}^{n}\frac{u_{i,j}^{n}-u_{i-1,j}^{n}}{\Delta x}+v_{i,j}^{n}\frac{u_{i,j}^{n}-u_{i,j-1}^{n}}{\Delta y}\\\
+&&=-\frac{1}{\rho}\frac{p_{i+1,j}^{n}-p_{i-1,j}^{n}}{2\Delta x}\\\
+&&+\nu\left(\frac{u_{i+1,j}^{n}-2u_{i,j}^{n}+u_{i-1,j}^{n}}{\Delta x^2}+\frac{u_{i,j+1}^{n}-2u_{i,j}^{n}+u_{i,j-1}^{n}}{\Delta y^2}\right)+F_{i,j}
+\end{eqnarray}
+
+The $v$-momentum equation:
+
+\begin{eqnarray}
+&&\frac{v_{i,j}^{n+1}-v_{i,j}^{n}}{\Delta t}+u_{i,j}^{n}\frac{v_{i,j}^{n}-v_{i-1,j}^{n}}{\Delta x}+v_{i,j}^{n}\frac{v_{i,j}^{n}-v_{i,j-1}^{n}}{\Delta y}\\\
+&&=-\frac{1}{\rho}\frac{p_{i,j+1}^{n}-p_{i,j-1}^{n}}{2\Delta y}\\\
+&&+\nu\left(\frac{v_{i+1,j}^{n}-2v_{i,j}^{n}+v_{i-1,j}^{n}}{\Delta x^2}+\frac{v_{i,j+1}^{n}-2v_{i,j}^{n}+v_{i,j-1}^{n}}{\Delta y^2}\right)
+\end{eqnarray}
+
+And the pressure equation:
+
+\begin{eqnarray}
+&&\frac{p_{i+1,j}^{n}-2p_{i,j}^{n}+p_{i-1,j}^{n}}{\Delta x^2}+\frac{p_{i,j+1}^{n}-2*p_{i,j}^{n}+p_{i,j-1}^{n}}{\Delta y^2}\\\
+&&=\rho\left(\frac{1}{\Delta t}\left(\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}+\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right)\right.\\\
+&&-\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\\\
+&&-2\frac{u_{i,j+1}-u_{i,j-1}}{2\Delta y}\frac{v_{i+1,j}-v_{i-1,j}}{2\Delta x}\\\
+&&-\left.\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right)
+\end{eqnarray}
+
+
+For the $u$- and $v$ momentum equations, we isolate the velocity at time step `n+1`:
+
+$$u_{i,j}^{n+1} = u_{i,j}^{n} - u_{i,j}^{n}\frac{\Delta t}{\Delta x}(u_{i,j}^{n}-u_{i-1,j}^{n})-v_{i,j}^{n}\frac{\Delta t}{\Delta y}(u_{i,j}^{n}-u_{i,j-1}^{n})$$
+$$-\frac{\Delta t}{\rho 2\Delta x}(p_{i+1,j}^{n}-p_{i-1,j}^{n})+\nu\left[\frac{\Delta t}{\Delta x^2}(u_{i+1,j}^{n}-2u_{i,j}^{n}+u_{i-1,j}^{n})\right.$$
+$$+\left.\frac{\Delta t}{\Delta y^2}(u_{i,j+1}^{n}-2u_{i,j}^{n}+u_{i,j-1}^{n})\right] + F\Delta t$$
+
+$$v_{i,j}^{n+1}=v_{i,j}^{n} - u_{i,j}^{n}\frac{\Delta t}{\Delta x}(v_{i,j}^{n}-v_{i-1,j}^{n})-v_{i,j}^{n}\frac{\Delta t}{\Delta y}(v_{i,j}^{n}-v_{i,j-1}^{n})$$
+$$-\frac{\Delta t}{\rho 2\Delta y}(p_{i,j+1}^{n}-p_{i,j-1}^{n})+\nu\left[\frac{\Delta t}{\Delta x^2}(v_{i+1,j}^{n}-2v_{i,j}^{n}+v_{i-1,j}^{n})\right.$$
+$$+\left.\frac{\Delta t}{\Delta y^2}(v_{i,j+1}^{n}-2v_{i,j}^{n}+v_{i,j-1}^{n})\right]$$
+
+And for the pressure equation, we isolate the term $p_{i,j}^n$ to iterate in pseudo-time:
+
+$$p_{i,j}^{n} = \frac{(p_{i+1,j}^{n}+p_{i-1,j}^{n})\Delta y^2+(p_{i,j+1}^{n}+p_{i,j-1}^{n})\Delta x^2}{2(\Delta x^2+\Delta y^2)}-\frac{\rho\Delta x^2\Delta y^2}{2(\Delta x^2+\Delta y^2)}\times$$
+$$\left[\frac{1}{\Delta t}\left(\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}+\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right)- \frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x} \right.$$
+$$- 2\frac{u_{i,j+1}-u_{i,j-1}}{2\Delta y}\frac{v_{i+1,j}-v_{i-1,j}}{2\Delta x}-\left.\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right]$$
+
+The initial condition is $u, v, p=0$ everywhere, and at the boundary conditions are:
+
+$u, v, p$ are periodic on $x=0,2$
+
+$u, v =0$ at $y =0,2$
+
+$\frac{\partial p}{\partial y}=0$ at $y =0,2$
+
+$F=1$ everywhere.
+
+Let's begin by importing our usual run of libraries:
+
+** Julia Codes
+
+#+BEGIN_SRC julia
+using PyPlot
+function buildUpB(rho, dt, dx, dy, u, v)
+    b = zeros(size(u))
+    b[2:end-1,2:end-1]=rho*(1/dt*((u[2:end-1,3:end]-u[2:end-1,1:end-2])/(2*dx)+(v[3:end,2:end-1]-v[1:end-2,2:end-1])/(2*dy))-
+                      ((u[2:end-1,3:end]-u[2:end-1,1:end-2])/(2*dx)).^2-
+                      2*((u[3:end,2:end-1]-u[1:end-2,2:end-1])/(2*dy).*(v[2:end-1,3:end]-v[2:end-1,1:end-2])/(2*dx))-
+                      ((v[3:end,2:end-1]-v[1:end-2,2:end-1])/(2*dy)).^2)
+    
+    ####Periodic BC Pressure @ x = 2
+    b[2:end-1,end]=rho*(1/dt*((u[2:end-1,1]-u[2:end-1,end-1])/(2*dx)+(v[3:end,end]-v[1:end-2,end])/(2*dy))-
+        ((u[2:end-1,1]-u[2:end-1,end-1])/(2*dx)).^2-
+    2*((u[3:end,end]-u[1:end-2,end])/(2*dy).*(v[2:end-1,1]-v[2:end-1,end-1])/(2*dx))-
+    ((v[3:end,end]-v[1:end-2,end])/(2*dy)).^2)
+
+    ####Periodic BC Pressure @ x = 0
+    b[2:end-1,1]=rho*(1/dt*((u[2:end-1,2]-u[2:end-1,end])/(2*dx)+(v[3:end,1]-v[1:end-2,1])/(2*dy))-
+    ((u[2:end-1,2]-u[2:end-1,end])/(2*dx)).^2-
+    2*((u[3:end,1]-u[1:end-2,1])/(2*dy).*(v[2:end-1,2]-v[2:end-1,end])/(2*dx))-
+                    ((v[3:end,1]-v[1:end-2,1])/(2*dy)).^2)
+    
+    return b
+end
+
+function presPoissPeriodic(p, dx, dy)
+    pn = zeros(size(p))
+    
+    for q in 1:nit
+        pn = copy(p)
+        p[2:end-1,2:end-1] = ((pn[2:end-1,3:end]+pn[2:end-1,1:end-2])*dy^2+(pn[3:end,2:end-1]+pn[1:end-2,2:end-1])*dx^2)/
+            (2*(dx^2+dy^2)) -
+            dx^2*dy^2/(2*(dx^2+dy^2))*b[2:end-1,2:end-1]
+
+        ####Periodic BC Pressure @ x = 2
+        p[2:end-1,end] = ((pn[2:end-1,1]+pn[2:end-1,end-1])*dy^2+(pn[3:end,end]+pn[1:end-2,end])*dx^2)/
+            (2*(dx^2+dy^2)) -
+        dx^2*dy^2/(2*(dx^2+dy^2))*b[2:end-1,end]
+
+        ####Periodic BC Pressure @ x = 0
+        p[2:end-1,1] = ((pn[2:end-1,2]+pn[2:end-1,end])*dy^2+(pn[2:end-1,1]+pn[1:end-2,1])*dx^2)/
+            (2*(dx^2+dy^2)) -
+            dx^2*dy^2/(2*(dx^2+dy^2))*b[2:end-1,1]
+        
+        ####Wall boundary conditions, pressure
+        p[end,:] =p[end-1,:]     ##dp/dy = 0 at y = 2
+        p[1,:] = p[2,:]      ##dp/dy = 0 at y = 0
+    end
+    return p
+end
+
+##variable declarations
+nx = 41;
+ny = 41;
+nt = 10;
+nit=50 ;
+c = 1;
+dx = 2/(nx-1);
+dy = 2/(ny-1);
+x = linspace(0,2,nx);
+y = linspace(0,2,ny);
+xgrid = repmat(x', nx, 1);
+ygrid = repmat(y, 1, ny);
+
+##physical variables
+rho = 1;
+nu = .1;
+F = 1;
+dt = .01;
+
+#initial conditions
+u = zeros((ny,nx)); ##create a XxY vector of 0's
+un = zeros((ny,nx)); ##create a XxY vector of 0's
+
+v = zeros((ny,nx)); ##create a XxY vector of 0's
+vn = zeros((ny,nx)) ;##create a XxY vector of 0's
+
+p = ones((ny,nx)); ##create a XxY vector of 0's
+pn = ones((ny,nx)); ##create a XxY vector of 0's
+
+b = zeros((ny,nx));
+
+udiff = 1;
+stepcount = 0;
+
+while udiff > .001
+    un = copy(u)
+    vn = copy(v)
+
+    b = buildUpB(rho, dt, dx, dy, u, v);
+    p = presPoissPeriodic(p, dx, dy);
+
+    u[2:end-1,2:end-1] = un[2:end-1,2:end-1]-
+        un[2:end-1,2:end-1].*dt/dx.*(un[2:end-1,2:end-1]-un[2:end-1,1:end-2])-
+        vn[2:end-1,2:end-1].*dt/dy.*(un[2:end-1,2:end-1]-un[1:end-2,2:end-1])-
+        dt/(2*rho*dx)*(p[2:end-1,3:end]-p[2:end-1,1:end-2])+
+        nu*(dt/dx^2*(un[2:end-1,3:end]-2*un[2:end-1,2:end-1]+un[2:end-1,1:end-2])+
+        dt/dy^2*(un[3:end,2:end-1]-2*un[2:end-1,2:end-1]+un[1:end-2,2:end-1]))+F*dt
+
+    v[2:end-1,2:end-1] = vn[2:end-1,2:end-1]-
+        un[2:end-1,2:end-1].*dt/dx.*(vn[2:end-1,2:end-1]-vn[2:end-1,1:end-2])-
+        vn[2:end-1,2:end-1].*dt/dy.*(vn[2:end-1,2:end-1]-vn[1:end-2,2:end-1])-
+        dt/(2*rho*dy)*(p[3:end,2:end-1]-p[1:end-2,2:end-1])+
+        nu*(dt/dx^2*(vn[2:end-1,3:end]-2*vn[2:end-1,2:end-1]+vn[2:end-1,1:end-2])+
+        (dt/dy^2*(vn[3:end,2:end-1]-2*vn[2:end-1,2:end-1]+vn[1:end-2,2:end-1])))
+
+    ####Periodic BC u @ x = 2     
+    u[2:end-1,end] = un[2:end-1,end]-
+    un[2:end-1, end].*dt/dx.*(un[2:end-1,end]-un[2:end-1,end-1])-
+    vn[2:end-1,end].*dt/dy.*(un[2:end-1,end]-un[1:end-2,end])-
+        dt/(2*rho*dx)*(p[2:end-1,1]-p[2:end-1,end-1])+
+        nu*(dt/dx^2*(un[2:end-1,1]-2*un[2:end-1,end]+un[2:end-1,end-1])+
+        dt/dy^2*(un[3:end,end]-2*un[2:end-1,end]+un[1:end-2,end]))+F*dt;
+
+    ####Periodic BC u @ x = 0
+    u[2:end-1,1] = un[2:end-1,1]-
+        un[2:end-1,1].*dt/dx.*(un[2:end-1,1]-un[2:end-1,end])-
+        vn[2:end-1,1].*dt/dy.*(un[2:end-1,1]-un[1:end-2,1])-
+        dt/(2*rho*dx)*(p[2:end-1,2]-p[2:end-1,end])+
+        nu*(dt/dx^2*(un[2:end-1,2]-2*un[2:end-1,1]+un[2:end-1,end])+
+        dt/dy^2*(un[3:end,1]-2*un[2:end-1,1]+un[1:end-2,1]))+F*dt;
+
+    ####Periodic BC v @ x = 2
+    v[2:end-1,end] = vn[2:end-1,end]-
+    un[2:end-1, end].*dt/dx.*(vn[2:end-1,end]-vn[2:end-1,end-1])-
+        vn[2:end-1,end].*dt/dy.*(vn[2:end-1,end]-vn[1:end-2,end])-
+        dt/(2*rho*dy)*(p[3:end,end]-p[1:end-2,end])+
+        nu*(dt/dx^2*(vn[2:end-1,1]-2*vn[2:end-1,end]+vn[2:end-1,end-1])+
+        (dt/dy^2*(vn[3:end,end]-2*vn[2:end-1,end]+vn[1:end-2,end])));
+
+    ####Periodic BC v @ x = 0
+    v[2:end-1,1] = vn[2:end-1,1]-
+        un[2:end-1,1].*dt/dx.*(vn[2:end-1,1]-vn[2:end-1,end])-
+        vn[2:end-1,1].*dt/dy.*(vn[2:end-1,1]-vn[1:end-2,1])-
+        dt/(2*rho*dy)*(p[3:end,1]-p[1:end-2,1])+
+        nu*(dt/dx^2*(vn[2:end-1,2]-2*vn[2:end-1,1]+vn[2:end-1,end])+
+        (dt/dy^2*(vn[3:end,1]-2*vn[2:end-1,1]+vn[1:end-2,1])))  ;   
+
+
+    ####Wall BC: u,v = 0 @ y = 0,2
+    u[1,:] = 0;
+    u[end,:] = 0;
+    v[1,:] = 0;
+    v[end,:]=0;
+    
+    udiff = (sum(u)-sum(un))/sum(u);
+    stepcount += 1;
+end
+
+fig = figure(figsize = (11,7), dpi=100)
+quiver(xgrid[1:3:end, 1:3:end], ygrid[2:3:end, 2:3:end], u[2:3:end, 2:3:end], v[2:3:end, 2:3:end]);
+
+fig = figure(figsize = (11,7), dpi=100)
+quiver(x, y, u, v);
+#+END_SRC
+* DONE color map
+   CLOSED: [2016-09-24 Sat 09:30]
